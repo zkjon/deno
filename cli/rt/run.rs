@@ -1008,7 +1008,6 @@ pub async fn run(
     WorkerExecutionMode::Run,
     permissions,
     main_module,
-    None,
   )?;
 
   let exit_code = worker.run().await?;
