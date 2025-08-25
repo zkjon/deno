@@ -38,7 +38,6 @@ use deno_resolver::factory::ConfigDiscoveryOption;
 use deno_resolver::factory::NpmProcessStateOptions;
 use deno_resolver::factory::ResolverFactoryOptions;
 use deno_resolver::factory::SpecifiedImportMapProvider;
-use deno_resolver::factory::WorkspaceDirectoryProvider;
 use deno_resolver::import_map::WorkspaceExternalImportMapLoader;
 use deno_resolver::loader::MemoryFiles;
 use deno_resolver::npm::DenoInNpmPackageChecker;
@@ -563,10 +562,12 @@ impl CliFactory {
           self.text_only_progress_bar().clone(),
         )),
         match resolver_factory.npm_resolver()?.as_managed() {
-          Some(managed_npm_resolver) => Arc::new(
-            DenoTaskLifeCycleScriptsExecutor::new(managed_npm_resolver.clone()),
-          )
-            as Arc<dyn LifecycleScriptsExecutor>,
+          Some(managed_npm_resolver) => {
+            Arc::new(DenoTaskLifeCycleScriptsExecutor::new(
+              managed_npm_resolver.clone(),
+              self.text_only_progress_bar().clone(),
+            )) as Arc<dyn LifecycleScriptsExecutor>
+          }
           None => Arc::new(NullLifecycleScriptsExecutor),
         },
         self.text_only_progress_bar().clone(),
@@ -738,7 +739,6 @@ impl CliFactory {
             self.node_resolver().await?.clone(),
             self.npm_resolver().await?.clone(),
             self.sys(),
-            self.workspace_directory_provider()?.clone(),
             self.compiler_options_resolver()?.clone(),
             if cli_options.code_cache_enabled() {
               Some(self.code_cache()?.clone())
@@ -926,12 +926,6 @@ impl CliFactory {
       })
   }
 
-  fn workspace_directory_provider(
-    &self,
-  ) -> Result<&Arc<WorkspaceDirectoryProvider>, AnyError> {
-    Ok(self.workspace_factory()?.workspace_directory_provider()?)
-  }
-
   fn workspace_external_import_map_loader(
     &self,
   ) -> Result<&Arc<WorkspaceExternalImportMapLoader<CliSys>>, AnyError> {
@@ -1048,6 +1042,7 @@ impl CliFactory {
       self.maybe_lockfile().await?.cloned(),
       self.npm_installer_if_managed().await?.cloned(),
       npm_resolver.clone(),
+      self.text_only_progress_bar().clone(),
       self.sys(),
       self.create_cli_main_worker_options()?,
       self.root_permissions_container()?.clone(),
